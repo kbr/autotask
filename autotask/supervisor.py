@@ -1,24 +1,79 @@
+import signal
+import threading
 
 from django.db import (
     OperationalError,
     transaction,
 )
 
+from .conf import settings
+
 from .models import (
     SUPERVISOR_ACTIVE,
     TaskQueue,
 )
 
+
 class Supervisor(object):
-    pass
+    """
+    Manages the workers: start, restart and stop.
+    Runs in a separate thread.
+    """
+    def __init__(self):
+        self.timeout = settings.AUTOTASK_WORKER_MONITOR_INTERVALL
+
+    def __call__(self, exit_event):
+        while True:
+            if exit_event.wait(timeout=self.timeout):
+                break
+
+
+class QueueCleaner(object):
+    """
+    Removes outdated TaskQueue-Objects from the database.
+    Runs in a separate thread.
+    """
+    def __init__(self):
+        self.timeout = settings.AUTOTASK_CLEAN_INTERVALL
+
+    def __call__(self, exit_event):
+        while True:
+            if exit_event.wait(timeout=self.timeout):
+                break
+
+
+class ShutdownHandler(object):
+    """
+    Sets the event for terminating the threads.
+    """
+    def __init__(self, exit_event):
+        self.exit_event = exit_event
+
+    def __call__(self, *args, **kwargs):
+        self.exit_event.set()
 
 
 def start_supervisor():
     """
+    Start Supervisor if no other Supervisor is running.
     """
     if not set_supervisor_marker():
+        # marker not set, supervisor may be running in another process
         return
-
+    exit_event = threading.Event()
+    handler = ShutdownHandler(exit_event)
+    # handler should react on SIGINT, SIGHUP:
+    signal.signal(signal.SIGINT, handler)
+    signal.signal(signal.SIGHUP, handler)
+    # start Supervisor:
+    thread = threading.Thread(target=Supervisor(), args=(exit_event,))
+    thread.start()
+    # start QueueCleaner:
+    thread = threading.Thread(target=QueueCleaner(), args=(exit_event,))
+    thread.start()
+    # returning the ShutdownHandler can be ignored by the application
+    # but is useful for testing
+    return handler
 
 
 def set_supervisor_marker():
