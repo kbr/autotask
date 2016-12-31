@@ -2,6 +2,7 @@
 .DS_Store
 *.pyc
 __pycache__
+.cache/*
 # autotask.egg-info
 # build
 # dist

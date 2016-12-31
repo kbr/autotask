@@ -47,14 +47,6 @@ def mult(a, b):
 def mult2(a, b):
     return a * b
 
-@periodic_task(seconds=0.02, start_now=True)
-def gettime():
-    return time.time()
-
-@periodic_task(seconds=0.02, start_now=False)
-def gettime2():
-    return time.time()
-
 
 @pytest.mark.django_db
 class TestAutotask(object):
@@ -185,32 +177,25 @@ class TestAutotask(object):
         clean_queue()
         assert r.result == result
 
-    def _test_periodic_task_01(self):
-        """test periodic execution."""
-        # TODO: check: test fails randomly
-        r = gettime()
-        th = TaskHandler()
-        # run task and store the result
-        task = th.get_next_task()
-        th.handle_task(task)
-        result = r.result
-        # wait shorter than timedelta and try to get the task again.
-        time.sleep(0.01)
-        task = th.get_next_task()
-        assert task is None
-        # wait timedelta and run again
-        # result should have changed.
-        time.sleep(0.02)
-        task = th.get_next_task()
-        if task:
-            th.handle_task(task)
-        assert result != r.result
+    def test_periodic_task01(self):
 
-    def test_periodic_task_02(self):
-        """test delayed periodic execution."""
-        r = gettime2()
+        @periodic_task(seconds=0.02, start_now=True)
+        def gettime():
+            return time.time()
+
+        _ = gettime()
         th = TaskHandler()
-        # try to get the task
+        task = th.get_next_task()
+        assert task is not None
+
+    def test_periodic_task02(self):
+
+        @periodic_task(seconds=0.02, start_now=False)
+        def gettime():
+            return time.time()
+
+        _ = gettime()
+        th = TaskHandler()
         task = th.get_next_task()
         assert task is None
         # wait shorter than timedelta and try again.
