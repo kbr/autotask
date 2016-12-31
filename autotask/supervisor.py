@@ -24,9 +24,21 @@ class Supervisor(object):
         self.timeout = settings.AUTOTASK_WORKER_MONITOR_INTERVALL
 
     def __call__(self, exit_event):
+        self.start_workers()
         while True:
             if exit_event.wait(timeout=self.timeout):
+                self.terminate_workers()
                 break
+            self.check_workers()
+
+    def check_workers(self):
+        pass
+
+    def terminate_workers(self):
+        pass
+
+    def start_workers(self):
+        pass
 
 
 class QueueCleaner(object):
