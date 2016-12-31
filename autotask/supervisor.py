@@ -5,6 +5,7 @@ from django.db import (
     OperationalError,
     transaction,
 )
+from django.utils.timezone import now
 
 from .conf import settings
 
@@ -40,6 +41,17 @@ class QueueCleaner(object):
         while True:
             if exit_event.wait(timeout=self.timeout):
                 break
+            self.clean_queue()
+
+    @staticmethod
+    def clean_queue():
+        """
+        Removes no longer used task-entries from the database.
+        """
+        with transaction.atomic():
+            qs = TaskQueue.objects.filter(is_periodic=False, expire__lt=now())
+            if qs.count():
+                qs.delete()
 
 
 class ShutdownHandler(object):
