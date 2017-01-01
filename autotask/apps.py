@@ -2,7 +2,6 @@
 from django.apps import AppConfig
 
 from .conf import settings
-from .supervisor import start_supervisor
 
 
 class AutotaskConfig(AppConfig):
@@ -15,4 +14,7 @@ class AutotaskConfig(AppConfig):
         django-project runs with more than one process.
         """
         if settings.AUTOTASK_IS_ACTIVE:
+            # import of .supervisor here, so tests can run
+            # without raising an AppRegistryNotReady Exception
+            from .supervisor import start_supervisor  # noqa
             start_supervisor()
