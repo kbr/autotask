@@ -123,25 +123,6 @@ def exit_thread():
         connections.close_all()
 
 
-def start_supervisor():
-    """
-    Start Supervisor if no other Supervisor is running.
-    """
-    if not set_supervisor_marker():
-        # marker not set, supervisor may be running in another process
-        return
-    handler, exit_event = get_thread_shutdown_objects()
-    # start Supervisor:
-    thread = threading.Thread(target=Supervisor(), args=(exit_event,))
-    thread.start()
-    # start QueueCleaner:
-    thread = threading.Thread(target=QueueCleaner(), args=(exit_event,))
-    thread.start()
-    # returning the ShutdownHandler can be ignored by the application
-    # but is useful for testing
-    return handler
-
-
 def set_supervisor_marker():
     """
     Checks whether a supervisor for a project is running.
@@ -169,3 +150,27 @@ def set_supervisor_marker():
         # more than one process.
         return False
     return True
+
+
+def start_supervisor():
+    """
+    Start Supervisor if no other Supervisor is running.
+    Returns None if no supervisor has started, otherwise returns a
+    reference to the shutdown-handler. The latter should not get used by
+    the application but is used for testing.
+    """
+    if not set_supervisor_marker():
+        # marker already set, supervisor may be running in another process
+        return None
+    handler, exit_event = get_thread_shutdown_objects()
+    # start Supervisor:
+    thread = threading.Thread(target=Supervisor(), args=(exit_event,))
+    thread.start()
+    # start QueueCleaner:
+    thread = threading.Thread(target=QueueCleaner(), args=(exit_event,))
+    thread.start()
+    # returning the ShutdownHandler can be ignored by the application
+    # but is useful for testing
+    return handler
+
+

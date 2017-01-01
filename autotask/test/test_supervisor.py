@@ -41,7 +41,7 @@ def test_set_supervisor_marker_entry():
 @pytest.mark.django_db
 def test_start_supervisor():
     """
-    Start Supervisor and count the number of thread: one for the
+    Start Supervisor and count the number of threads: one for the
     Supervisor and one for the QueueCleaner. Test shutdown of both
     threads on calling the shutdown_handler.
     """
