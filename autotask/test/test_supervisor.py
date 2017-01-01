@@ -1,5 +1,8 @@
+import datetime
+import random
 import threading
 import time
+
 import pytest
 
 from django.utils.timezone import now
@@ -12,6 +15,8 @@ from autotask.models import (
 from autotask.supervisor import (
     set_supervisor_marker,
     start_supervisor,
+    Supervisor,
+    QueueCleaner,
 )
 
 
@@ -25,6 +30,9 @@ def test_set_supervisor_marker():
 
 @pytest.mark.django_db
 def test_set_supervisor_marker_entry():
+    """
+    Test entry of supervisor-marker in the database.
+    """
     assert TaskQueue.objects.all().count() == 0
     assert set_supervisor_marker() is True
     assert TaskQueue.objects.all().count() == 1
@@ -32,6 +40,11 @@ def test_set_supervisor_marker_entry():
 
 @pytest.mark.django_db
 def test_start_supervisor():
+    """
+    Start Supervisor and count the number of thread: one for the
+    Supervisor and one for the QueueCleaner. Test shutdown of both
+    threads on calling the shutdown_handler.
+    """
     ac = threading.active_count()
     shutdown_handler = start_supervisor()
     nc = threading.active_count()
@@ -44,16 +57,102 @@ def test_start_supervisor():
 
 
 @pytest.mark.django_db
-def _test_queuecleaner():
+def test_supervisor_cleanup():
+    """
+    Periodic Tasks should be removed from the database when the
+    supervisor shuts down. So there should be at least one Task in the
+    db after starting the supervisor (the marker task) but there should
+    be no task left in the db after the supervisor exits.
+    """
+    assert TaskQueue.objects.filter(is_periodic=True).count() == 0
+    set_supervisor_marker()
+    assert TaskQueue.objects.filter(is_periodic=True).count() == 1
+    supervisor = Supervisor()
+    supervisor.delete_periodic_tasks()
+    time.sleep(0.1)  # give thread some time to terminate
+    assert TaskQueue.objects.filter(is_periodic=True).count() == 0
+
+
+@pytest.mark.django_db
+def test_supervisor_terminatecleanup():
+    """
+    Periodic Tasks should be removed from the database when the
+    supervisor shuts down. So there should be at least one Task in the
+    db after starting the supervisor (the marker task) but there should
+    be no task left in the db after the supervisor exits.
+    """
+    assert TaskQueue.objects.filter(is_periodic=True).count() == 0
+    set_supervisor_marker()
+    assert TaskQueue.objects.filter(is_periodic=True).count() == 1
+    supervisor = Supervisor()
+    supervisor.stop_workers()
+    time.sleep(0.1)  # give thread some time to terminate
+    assert TaskQueue.objects.filter(is_periodic=True).count() == 0
+
+
+@pytest.mark.django_db
+def test_start_workers():
+    """
+    Test successfull start of worker processes.
+    """
+    supervisor = Supervisor(workers=2)
+    supervisor.start_workers()
+    assert len(supervisor.processes) == 2
+
+
+@pytest.mark.django_db
+def test_stop_workers():
+    """
+    Test successfull stop of worker processes.
+    """
+    supervisor = Supervisor(workers=2)
+    supervisor.start_workers()
+    processes = supervisor.processes.copy()
+    for process in processes:
+        assert process.poll() is None  # up and running
+    supervisor.stop_workers()
+    for process in processes:
+        assert process.poll() is not None  # down
+
+
+@pytest.mark.django_db
+def test_check_workers():
+    """
+    Test successfull restart worker processes.
+    """
+    def get_running_process_num(supervisor):
+        return sum(process.poll() is None for process in supervisor.processes)
+
+    supervisor = Supervisor(workers=2)
+    supervisor.start_workers()
+    assert get_running_process_num(supervisor) == 2
+    process = random.choice(supervisor.processes)
+    process.terminate()
+    time.sleep(0.1)  # allow process some time to terminate
+    assert get_running_process_num(supervisor) == 1
+    supervisor.check_workers()
+    assert get_running_process_num(supervisor) == 2
+
+
+@pytest.mark.django_db
+def test_queuecleaner():
+    """
+    Runs periodically to remove expired tasks from the database.
+    """
+    assert TaskQueue.objects.filter(is_periodic=False).count() == 0
+    set_supervisor_marker()
+    assert TaskQueue.objects.all().count() == 1
+    assert TaskQueue.objects.filter(is_periodic=False).count() == 0
     task = TaskQueue()
-    task.status = DONE
-    task.ttl = 0
+    task.is_periodic = False
+    task.expire = now() + datetime.timedelta(minutes=5)
+    task.save()
+    assert TaskQueue.objects.filter(is_periodic=False).count() == 1
+    qc = QueueCleaner()
+    qc.clean_queue()
+    assert TaskQueue.objects.filter(is_periodic=False).count() == 1
     task.expire = now()
     task.save()
+    qc.clean_queue()
+    assert TaskQueue.objects.filter(is_periodic=False).count() == 0
     assert TaskQueue.objects.all().count() == 1
-    shutdown_handler = start_supervisor()
-    time.sleep(0.1)  # give thread some time to run
-    # still 1 because of supervisor marker entry
-    assert TaskQueue.objects.all().count() == 1
-    shutdown_handler()  # shut down supervisor-thread
-

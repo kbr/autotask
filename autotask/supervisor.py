@@ -1,10 +1,13 @@
-import signal
+import subprocess
 import threading
 
 from django.db import (
+    DEFAULT_DB_ALIAS,
     OperationalError,
     transaction,
+    connections,
 )
+from django.conf import settings as django_settings
 from django.utils.timezone import now
 
 from .conf import settings
@@ -13,32 +16,65 @@ from .models import (
     SUPERVISOR_ACTIVE,
     TaskQueue,
 )
+from .shutdown import get_thread_shutdown_objects
 
 
 class Supervisor(object):
     """
     Manages the workers: start, restart and stop.
-    Runs in a separate thread.
+    The supervisor runs in a separate thread.
     """
-    def __init__(self):
+    def __init__(self, workers=settings.AUTOTASK_WORKERS):
         self.timeout = settings.AUTOTASK_WORKER_MONITOR_INTERVALL
+        self.workers = workers  # number of workers to start
+        self.processes = []
 
     def __call__(self, exit_event):
         self.start_workers()
         while True:
             if exit_event.wait(timeout=self.timeout):
-                self.terminate_workers()
                 break
             self.check_workers()
-
-    def check_workers(self):
-        pass
-
-    def terminate_workers(self):
-        pass
+        self.stop_workers()
+        exit_thread()
 
     def start_workers(self):
-        pass
+         self.processes = [self.start_worker() for n in range(self.workers)]
+
+    def start_worker(self):
+        # use of Popen for Python 2 compatibility
+        return subprocess.Popen([settings.AUTOTASK_WORKER_EXECUTABLE,
+                                'manage.py', 'run_autotask'],
+                                 cwd=django_settings.BASE_DIR)
+
+    def check_workers(self):
+        missing_processes = [process for process in self.processes
+                             if process.poll() is not None]
+        for process in missing_processes:
+            self.processes.remove(process)
+            self.processes.append(self.start_worker())
+
+    def stop_workers(self):
+        for process in self.processes:
+            try:
+                process.terminate()
+            except OSError:
+                # can happen with python 2.7 if the worker has been
+                # restarted without unregistering the previous process
+                pass
+        self.processes = []
+        self.delete_periodic_tasks()
+
+    @transaction.atomic
+    def delete_periodic_tasks(self):
+        """
+        Tasks are persistent in the db. Periodic tasks are read in at
+        process start and will not expire. So they should get deleted
+        here.
+        """
+        qs = TaskQueue.objects.filter(is_periodic=True)
+        if qs.count():
+            qs.delete()
 
 
 class QueueCleaner(object):
@@ -54,12 +90,11 @@ class QueueCleaner(object):
             if exit_event.wait(timeout=self.timeout):
                 break
             self.clean_queue()
+        exit_thread()
 
     @staticmethod
     def clean_queue():
-        """
-        Removes no longer used task-entries from the database.
-        """
+        """Removes no longer used task-entries from the database."""
         with transaction.atomic():
             qs = TaskQueue.objects.filter(is_periodic=False, expire__lt=now())
             if qs.count():
@@ -77,6 +112,17 @@ class ShutdownHandler(object):
         self.exit_event.set()
 
 
+def exit_thread():
+    """
+    Should get called from ending threads to close all
+    database-connections in debug-mode. This is for running tests, so
+    that the test-database gets unlocked and can be closed from pytest
+    running in another thread.
+    """
+    if settings.DEBUG:
+        connections.close_all()
+
+
 def start_supervisor():
     """
     Start Supervisor if no other Supervisor is running.
@@ -84,11 +130,7 @@ def start_supervisor():
     if not set_supervisor_marker():
         # marker not set, supervisor may be running in another process
         return
-    exit_event = threading.Event()
-    handler = ShutdownHandler(exit_event)
-    # handler should react on SIGINT, SIGHUP:
-    signal.signal(signal.SIGINT, handler)
-    signal.signal(signal.SIGHUP, handler)
+    handler, exit_event = get_thread_shutdown_objects()
     # start Supervisor:
     thread = threading.Thread(target=Supervisor(), args=(exit_event,))
     thread.start()
