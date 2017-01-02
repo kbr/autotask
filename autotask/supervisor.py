@@ -1,3 +1,4 @@
+import os
 import subprocess
 import threading
 
@@ -16,7 +17,7 @@ from .models import (
     SUPERVISOR_ACTIVE,
     TaskQueue,
 )
-from .shutdown import get_thread_shutdown_objects
+from .shutdown import get_shutdown_objects
 
 
 class Supervisor(object):
@@ -48,6 +49,10 @@ class Supervisor(object):
                                  cwd=django_settings.BASE_DIR)
 
     def check_workers(self):
+        """
+        Check whether all registered workers are up.
+        Terminated processes (for whatever reason) are restarted.
+        """
         missing_processes = [process for process in self.processes
                              if process.poll() is not None]
         for process in missing_processes:
@@ -55,6 +60,7 @@ class Supervisor(object):
             self.processes.append(self.start_worker())
 
     def stop_workers(self):
+        """terminate all registered workers."""
         for process in self.processes:
             try:
                 process.terminate()
@@ -65,16 +71,25 @@ class Supervisor(object):
         self.processes = []
         self.delete_periodic_tasks()
 
-    @transaction.atomic
-    def delete_periodic_tasks(self):
+    @staticmethod
+    def delete_periodic_tasks():
         """
-        Tasks are persistent in the db. Periodic tasks are read in at
-        process start and will not expire. So they should get deleted
-        here.
+        Call the module level function with the same name.
+        This is an indirection to allow this function get called as a
+        method and registered for atexit.
         """
-        qs = TaskQueue.objects.filter(is_periodic=True)
-        if qs.count():
-            qs.delete()
+        delete_periodic_tasks()
+
+
+def delete_periodic_tasks():
+    """
+    Tasks are persistent in the db. Periodic tasks are read in at
+    process start and will not expire. So they should get deleted
+    here.
+    """
+    qs = TaskQueue.objects.filter(is_periodic=True)
+    if qs.count():
+        qs.delete()
 
 
 class QueueCleaner(object):
@@ -138,6 +153,8 @@ def set_supervisor_marker():
             marker = TaskQueue()
             marker.status = SUPERVISOR_ACTIVE  # ignored by TaskHandler
             marker.is_periodic = True  # but cleaned up at exit
+            marker.module = __name__  # ident supervisor marker
+            marker.function = str(os.getpid())  # id of supervisor process
             marker.save()
     except OperationalError:
         # This exception is needed for SQLite3 which does not
@@ -162,7 +179,7 @@ def start_supervisor():
     if not set_supervisor_marker():
         # marker already set, supervisor may be running in another process
         return None
-    handler, exit_event = get_thread_shutdown_objects()
+    handler, exit_event = get_shutdown_objects()
     for service in (Supervisor, QueueCleaner):
         thread = threading.Thread(target=service(), args=(exit_event,))
         thread.start()

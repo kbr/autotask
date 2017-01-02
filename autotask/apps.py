@@ -1,6 +1,6 @@
+import atexit
 
 from django.apps import AppConfig
-
 from .conf import settings
 
 
@@ -16,5 +16,14 @@ class AutotaskConfig(AppConfig):
         if settings.AUTOTASK_IS_ACTIVE:
             # import of .supervisor here, so tests can run
             # without raising an AppRegistryNotReady Exception
-            from .supervisor import start_supervisor  # noqa
+            from .supervisor import (  # noqa
+                start_supervisor,
+                delete_periodic_tasks
+            )
             start_supervisor()
+            # fallback in case the supervisor-thread terminates without
+            # a proper cleanup.
+            # Also abandoned supervisor marker preventing autotask to start
+            # can be removed this way.
+            # (remove marker manually or start and restart django)
+            atexit.register(delete_periodic_tasks)

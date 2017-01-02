@@ -15,7 +15,7 @@ from .models import (
     ERROR,
     TaskQueue,
 )
-from .shutdown import get_worker_shutdown_objects
+from .shutdown import get_shutdown_objects
 
 
 class TaskHandler(object):
@@ -139,6 +139,6 @@ def start_worker():
     Entry-Point to start the worker from the run_autotask management
     command. This command should not invoked manually.
     """
-    _, exit_event = get_worker_shutdown_objects()
+    _, exit_event = get_shutdown_objects()
     th = TaskHandler(exit_event)
     th.run()
