@@ -123,8 +123,8 @@ def set_supervisor_marker():
                 return False
             marker = TaskQueue()
             marker.status = SUPERVISOR_ACTIVE  # ignored by TaskHandler
-            marker.is_periodic = True  # but cleaned up at exit
-            marker.module = __name__  # ident supervisor marker
+            marker.is_periodic = True  # cleaned up at exit
+            marker.module = __name__  # ident for supervisor marker
             marker.function = str(os.getpid())  # id of supervisor process
             marker.save()
     except OperationalError:

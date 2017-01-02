@@ -12,7 +12,6 @@ from autotask.models import (
     ERROR,
     TaskQueue,
 )
-
 from autotask.supervisor import clean_queue
 from autotask.tasks import (
     DelayedTask,
