@@ -2,6 +2,12 @@
 
 autotask is a **django-application** for handling asynchronous tasks without the need to install, configure and supervise additional processes (like celery, redis or rabbitmq). autotask is aimed for applications where asynchronous tasks happend occasionally and the installation, configuration and monitoring of an additionally technology stack seems to be to much overhead.
 
+##Requirements
+
+- Python >= 3.3, 2.7
+- Django >= 1.8
+- Database: PostgreSQL
+
 
 ##Installation
 
@@ -24,7 +30,18 @@ Run migrations to install the database-table used by *autotask*:
 
 ##Usage
 
-autotask offers three decorators for handling asynchronous task:
+Activate *autotask* in *settings.py* ::
+
+    AUTOTASK_IS_ACTIVE = True
+
+**Notes:**
+
+- Don't activate *autotask* before running ``python manage.py migrate``. Otherwise *autotask* will try to access an undefined database-table.
+- Don't run test with *autotask* activated. This will break tests because of an atexit-handler.
+- If *autotask* has not shutdown properly (because of a *kill 9* or some strange crash) a supervisor-marker may stay in the database preventing to start autotask the next time. In this case just restart the django process.
+
+
+**autotask** offers three decorators for handling asynchronous task:
 
     from autotask.tasks import (
         delayed_task,
@@ -109,17 +126,24 @@ If neither **dom** nor **dow** are given, then the task should run every day of 
 If the argument **crontab** is given all other arguments are ignored.
 
 
-##Requirements
 
-- Python >= 3.3, 2.7
-- Django >= 1.8
-- Database: PostgreSQL
+##Settings
+
+All settings are optional and preset with default values. To override these defaults redefine them in the *settings.py* file.
+
+**``AUTOTASK_IS_ACTIVE``**: Boolean. If *True* autotask will start a worker-process to handle the decorated tasks. Defaults to *False* (for easiers installation).
+
+**``AUTOTASK_WORKERS``**: Integer. Number of worker-processes to start. Defaults to 1. (new in version 0.6)
+
+**``AUTOTASK_WORKER_EXECUTABLE``**: String. Path to the executable for *manage.py <command>*. Must be absolute or relative to the working directory defined by BASE_DIR in the *settings.py* file. Defaults to "python" without a leading path.
+
+**``AUTOTASK_WORKER_MONITOR_INTERVALL``**: Integer. Time in seconds for autotask to check whether the worker process is alive. Defaults to 5.
+
+**``AUTOTASK_HANDLE_TASK_IDLE_TIME``**: Integer. Time in seconds to sleep on idle times. After processing a task autotask checks for the next task and executes it without delay if its scheduled for the current time. If no scheduled task is found autotasks sleeps for the given time in seconds. Defaults to 10.
+
+**``AUTOTASK_RETRY_DELAY``**: Integer. Time in seconds autotask waits before executing a *@delayed_task* again in case an error has occured. Errors are unhandled exeptions. Defaults to 2.
+
+**``AUTOTASK_CLEAN_INTERVALL``**: Integer. Time in seconds between database cleanup runs. After running a *@delayed_task* the result is stored for at least the given time to live (the decorator *ttl* parameter). After this period the entry will get removed by the next cleanup run to prevent the accumulation of outdated tasks in the database. Defaults to 600.
 
 
-##How does this work
 
-For every django-process a corresponding worker-process gets started by autotask to handle delayed or periodic tasks.
-
-The worker-process is monitored: if the worker terminates (for whatever reason) a restart will happen after a few seconds.
-
-If the django-process terminates, the worker terminates also.

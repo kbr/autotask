@@ -8,7 +8,7 @@ def readme():
 
 
 setup(name='autotask',
-      version='0.5.3',
+      version='0.6',
       description='A django-application for handling asynchronous tasks.',
       long_description=readme(),
       classifiers=[
@@ -22,9 +22,10 @@ setup(name='autotask',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
       ],
-      keywords='django-application autotask asynchron',
-      url='https://bitbucket.org/kbr/autotask',
+      keywords='django task job queue',
+      url='https://github.com/kbr/autotask',
       author='Klaus Bremer',
       author_email='bremer@bremer-media.de',
       license='MIT',

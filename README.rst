@@ -42,7 +42,12 @@ Activate *autotask* in *settings.py* ::
 
     AUTOTASK_IS_ACTIVE = True
 
-Note: don't activate *autotask* before running *python manage.py migrate*. Otherwise *autotask* will try to access an undefined database-table.
+**Notes:**
+
+    - Don't activate *autotask* before running ``python manage.py migrate``. Otherwise *autotask* will try to access an undefined database-table.
+    - Don't run test with *autotask* activated. This will break tests because of an atexit-handler.
+    - If *autotask* has not shutdown properly (because of a *kill 9* or some strange crash) a supervisor-marker may stay in the database preventing to start autotask the next time. In this case just restart the django process.
+
 
 *autotask* offers three decorators to handle asynchronous tasks ::
 
@@ -217,6 +222,8 @@ All settings are optional and preset with default values. To override these defa
 
 **AUTOTASK_IS_ACTIVE**: Boolean. If *True* autotask will start a worker-process to handle the decorated tasks. Defaults to *False* (for easiers installation).
 
+**AUTOTASK_WORKERS**: Integer. Number of worker-processes to start. Defaults to 1. (new in version 0.6)
+
 **AUTOTASK_WORKER_EXECUTABLE**: String. Path to the executable for *manage.py <command>*. Must be absolute or relative to the working directory defined by BASE_DIR in the *settings.py* file. Defaults to "python" without a leading path.
 
 **AUTOTASK_WORKER_MONITOR_INTERVALL**: Integer. Time in seconds for autotask to check whether the worker process is alive. Defaults to 5.
@@ -228,21 +235,15 @@ All settings are optional and preset with default values. To override these defa
 **AUTOTASK_CLEAN_INTERVALL**: Integer. Time in seconds between database cleanup runs. After running a *@delayed_task* the result is stored for at least the given time to live (the decorator *ttl* parameter). After this period the entry will get removed by the next cleanup run to prevent the accumulation of outdated tasks in the database. Defaults to 600.
 
 
-How does this work
-------------------
-
-For every django-process a corresponding worker-process gets started by autotask to handle delayed or periodic tasks.
-The worker-process is monitored: if the worker terminates (for whatever reason) a restart will happen after a few seconds.
-If the django-process terminates, the worker terminates also.
-
-Handling a lot of delayed tasks can add an additional load to the database. It depends on the application whether this may be an issue.
-
-It is not the intention of autotask to invoke the workers as fast as possible on incoming tasks but to delegate time consuming and periodic jobs.
-
-
 
 Releases
 --------
+
+0.6
+...
+
+Major refactoring. Scaling decoupled from django processes.
+New AUTOTASK_WORKERS setting.
 
 0.5.3
 .....

@@ -1,6 +1,13 @@
 Releases
 --------
 
+0.6
+...
+
+Major refactoring. Scaling decoupled from django processes.
+New AUTOTASK_WORKERS setting.
+
+
 0.5.3
 .....
 
