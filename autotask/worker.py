@@ -1,3 +1,10 @@
+import datetime
+
+from django.db import (
+    OperationalError,
+    transaction,
+)
+from django.utils.timezone import now
 
 from .conf import settings
 from .cron import CronScheduler
@@ -26,12 +33,12 @@ class TaskHandler(object):
         while True:
             if task:
                 self.handle_task(task)
-            if exit_event.is_set():
+            if self.exit_event.is_set():
                 break
             task = self.get_next_task()
             if task:
                 continue
-            if exit_event.wait(timeout=self.idle_time):
+            if self.exit_event.wait(timeout=self.idle_time):
                 break
 
     def get_next_task(self):

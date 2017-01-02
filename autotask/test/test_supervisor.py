@@ -57,7 +57,7 @@ def test_start_supervisor():
 
 
 @pytest.mark.django_db
-def test_supervisor_cleanup():
+def test_supervisor_cleanup_periodic_tasks():
     """
     Periodic Tasks should be removed from the database when the
     supervisor shuts down. So there should be at least one Task in the
@@ -98,6 +98,9 @@ def test_start_workers():
     supervisor = Supervisor(workers=2)
     supervisor.start_workers()
     assert len(supervisor.processes) == 2
+    # assume this works to not leave some running processes
+    # after the pytest-run. There is a separate test for this.
+    supervisor.stop_workers()
 
 
 @pytest.mark.django_db
@@ -126,12 +129,22 @@ def test_check_workers():
     supervisor = Supervisor(workers=2)
     supervisor.start_workers()
     assert get_running_process_num(supervisor) == 2
+    # terminate a random process:
     process = random.choice(supervisor.processes)
     process.terminate()
     time.sleep(0.1)  # allow process some time to terminate
     assert get_running_process_num(supervisor) == 1
     supervisor.check_workers()
     assert get_running_process_num(supervisor) == 2
+    # terminate all processes:
+    for process in supervisor.processes:
+        process.terminate()
+    time.sleep(0.1)  # allow processes some time to terminate
+    assert get_running_process_num(supervisor) == 0
+    supervisor.check_workers()
+    assert get_running_process_num(supervisor) == 2
+    # clean up:
+    supervisor.stop_workers()
 
 
 @pytest.mark.django_db

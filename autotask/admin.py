@@ -13,8 +13,11 @@ class TaskQueueAdmin(admin.ModelAdmin):
         """
         # shortcut: fn is the function_name
         fn = obj.function
-        index = fn.rindex('_')
-        if index > -1:
+        try:
+            index = fn.rindex('_')
+        except ValueError:
+            pass
+        else:
             fn = fn[:index]
         return fn
 
