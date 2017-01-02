@@ -69,27 +69,6 @@ class Supervisor(object):
                 # restarted without unregistering the previous process
                 pass
         self.processes = []
-        self.delete_periodic_tasks()
-
-    @staticmethod
-    def delete_periodic_tasks():
-        """
-        Call the module level function with the same name.
-        This is an indirection to allow this function get called as a
-        method and registered for atexit.
-        """
-        delete_periodic_tasks()
-
-
-def delete_periodic_tasks():
-    """
-    Tasks are persistent in the db. Periodic tasks are read in at
-    process start and will not expire. So they should get deleted
-    here.
-    """
-    qs = TaskQueue.objects.filter(is_periodic=True)
-    if qs.count():
-        qs.delete()
 
 
 class QueueCleaner(object):
@@ -136,6 +115,17 @@ def exit_thread():
     """
     if settings.DEBUG:
         connections.close_all()
+
+
+def delete_periodic_tasks():
+    """
+    Tasks are persistent in the db. Periodic tasks are read in at
+    process start and will not expire. So they should get deleted
+    here.
+    """
+    qs = TaskQueue.objects.filter(is_periodic=True)
+    if qs.count():
+        qs.delete()
 
 
 def set_supervisor_marker():

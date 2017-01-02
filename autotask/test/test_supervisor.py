@@ -13,6 +13,7 @@ from autotask.models import (
 )
 
 from autotask.supervisor import (
+    delete_periodic_tasks,
     set_supervisor_marker,
     start_supervisor,
     Supervisor,
@@ -57,7 +58,7 @@ def test_start_supervisor():
 
 
 @pytest.mark.django_db
-def test_supervisor_cleanup_periodic_tasks():
+def test_cleanup_periodic_tasks():
     """
     Periodic Tasks should be removed from the database when the
     supervisor shuts down. So there should be at least one Task in the
@@ -67,26 +68,7 @@ def test_supervisor_cleanup_periodic_tasks():
     assert TaskQueue.objects.filter(is_periodic=True).count() == 0
     set_supervisor_marker()
     assert TaskQueue.objects.filter(is_periodic=True).count() == 1
-    supervisor = Supervisor()
-    supervisor.delete_periodic_tasks()
-    time.sleep(0.1)  # give thread some time to terminate
-    assert TaskQueue.objects.filter(is_periodic=True).count() == 0
-
-
-@pytest.mark.django_db
-def test_supervisor_terminatecleanup():
-    """
-    Periodic Tasks should be removed from the database when the
-    supervisor shuts down. So there should be at least one Task in the
-    db after starting the supervisor (the marker task) but there should
-    be no task left in the db after the supervisor exits.
-    """
-    assert TaskQueue.objects.filter(is_periodic=True).count() == 0
-    set_supervisor_marker()
-    assert TaskQueue.objects.filter(is_periodic=True).count() == 1
-    supervisor = Supervisor()
-    supervisor.stop_workers()
-    time.sleep(0.1)  # give thread some time to terminate
+    delete_periodic_tasks()
     assert TaskQueue.objects.filter(is_periodic=True).count() == 0
 
 
@@ -114,6 +96,7 @@ def test_stop_workers():
     for process in processes:
         assert process.poll() is None  # up and running
     supervisor.stop_workers()
+    time.sleep(0.1)  # allow process to stop
     for process in processes:
         assert process.poll() is not None  # down
 
