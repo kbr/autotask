@@ -12,13 +12,13 @@ from autotask.models import (
     ERROR,
     TaskQueue,
 )
+from autotask.supervisor import clean_queue
 from autotask.tasks import (
     DelayedTask,
     delayed_task,
     periodic_task,
 )
-from autotask.workers import (
-    clean_queue,
+from autotask.worker import (
     TaskHandler,
 )
 
@@ -89,9 +89,11 @@ class TestAutotask(object):
 
     def test_taskhandler_02(self):
         """Test whether is an entry in the database."""
+        n = TaskQueue.objects.all().count()
+        assert n == 0
         r = add2(2, 2)
         n = TaskQueue.objects.all().count()
-        assert 1 == n
+        assert n == 1
 
     def test_taskhandler_03(self):
         """Test for accessing this entry."""

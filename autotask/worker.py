@@ -1,4 +1,6 @@
 import datetime
+import importlib
+import pickle
 
 from django.db import (
     OperationalError,
@@ -21,7 +23,7 @@ from .shutdown import get_shutdown_objects
 class TaskHandler(object):
     """The worker thread for handling callables."""
 
-    def __init__(self, exit_event):
+    def __init__(self, exit_event=None):
         self.exit_event = exit_event
         self.idle_time = settings.AUTOTASK_HANDLE_TASK_IDLE_TIME
         self.retry_delay = datetime.timedelta(

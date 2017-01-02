@@ -71,50 +71,24 @@ class Supervisor(object):
         self.processes = []
 
 
-class QueueCleaner(object):
+def clean_queue_periodically(exit_event):
     """
-    Removes outdated TaskQueue-Objects from the database.
-    Runs in a separate thread.
+    Call clean_queue() periodically in a seperate thread.
     """
-    def __init__(self):
-        self.timeout = settings.AUTOTASK_CLEAN_INTERVALL
-
-    def __call__(self, exit_event):
-        while True:
-            if exit_event.wait(timeout=self.timeout):
-                break
-            self.clean_queue()
-        exit_thread()
-
-    @staticmethod
-    def clean_queue():
-        """Removes no longer used task-entries from the database."""
-        with transaction.atomic():
-            qs = TaskQueue.objects.filter(is_periodic=False, expire__lt=now())
-            if qs.count():
-                qs.delete()
+    timeout = setting.AUTOTASK_CLEAN_INTERVALL
+    while True:
+        if exit_event.wait(setting.AUTOTASK_CLEAN_INTERVALL):
+            break
+        clean_queue()
+    exit_thread()
 
 
-class ShutdownHandler(object):
-    """
-    Sets the event for terminating the threads.
-    """
-    def __init__(self, exit_event):
-        self.exit_event = exit_event
-
-    def __call__(self, *args, **kwargs):
-        self.exit_event.set()
-
-
-def exit_thread():
-    """
-    Should get called from ending threads to close all
-    database-connections in debug-mode. This is for running tests, so
-    that the test-database gets unlocked and can be closed from pytest
-    running in another thread.
-    """
-    if settings.DEBUG:
-        connections.close_all()
+def clean_queue():
+    """Removes no longer used task-entries from the database."""
+    with transaction.atomic():
+        qs = TaskQueue.objects.filter(is_periodic=False, expire__lt=now())
+        if qs.count():
+            qs.delete()
 
 
 def delete_periodic_tasks():
@@ -126,6 +100,17 @@ def delete_periodic_tasks():
     qs = TaskQueue.objects.filter(is_periodic=True)
     if qs.count():
         qs.delete()
+
+
+def exit_thread():
+    """
+    Should get called from ending threads to close all
+    database-connections in debug-mode. This is for running tests, so
+    that the test-database gets unlocked and can be closed from pytest
+    running in another thread.
+    """
+    if settings.DEBUG:
+        connections.close_all()
 
 
 def set_supervisor_marker():
@@ -170,8 +155,8 @@ def start_supervisor():
         # marker already set, supervisor may be running in another process
         return None
     handler, exit_event = get_shutdown_objects()
-    for service in (Supervisor, QueueCleaner):
-        thread = threading.Thread(target=service(), args=(exit_event,))
+    for service in (Supervisor(), clean_queue_periodically):
+        thread = threading.Thread(target=service, args=(exit_event,))
         thread.start()
     # returning the ShutdownHandler can be ignored by the application
     # but is useful for testing

@@ -13,11 +13,11 @@ from autotask.models import (
 )
 
 from autotask.supervisor import (
+    clean_queue,
     delete_periodic_tasks,
     set_supervisor_marker,
     start_supervisor,
     Supervisor,
-    QueueCleaner,
 )
 
 
@@ -131,7 +131,7 @@ def test_check_workers():
 
 
 @pytest.mark.django_db
-def test_queuecleaner():
+def test_clean_queue():
     """
     Runs periodically to remove expired tasks from the database.
     """
@@ -144,11 +144,10 @@ def test_queuecleaner():
     task.expire = now() + datetime.timedelta(minutes=5)
     task.save()
     assert TaskQueue.objects.filter(is_periodic=False).count() == 1
-    qc = QueueCleaner()
-    qc.clean_queue()
+    clean_queue()
     assert TaskQueue.objects.filter(is_periodic=False).count() == 1
     task.expire = now()
     task.save()
-    qc.clean_queue()
+    clean_queue()
     assert TaskQueue.objects.filter(is_periodic=False).count() == 0
     assert TaskQueue.objects.all().count() == 1
