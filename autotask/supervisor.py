@@ -40,7 +40,7 @@ class Supervisor(object):
         exit_thread()
 
     def start_workers(self):
-         self.processes = [self.start_worker() for n in range(self.workers)]
+        self.processes = [self.start_worker() for n in range(self.workers)]
 
     def start_worker(self):
         # use of Popen for Python 2 compatibility
@@ -72,10 +72,7 @@ class Supervisor(object):
 
 
 def clean_queue_periodically(exit_event):
-    """
-    Call clean_queue() periodically in a seperate thread.
-    """
-    timeout = setting.AUTOTASK_CLEAN_INTERVALL
+    """Call clean_queue() periodically in a separate thread."""
     while True:
         if exit_event.wait(setting.AUTOTASK_CLEAN_INTERVALL):
             break
