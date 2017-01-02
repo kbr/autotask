@@ -3,7 +3,6 @@ import subprocess
 import threading
 
 from django.db import (
-    DEFAULT_DB_ALIAS,
     OperationalError,
     transaction,
     connections,
@@ -12,7 +11,6 @@ from django.conf import settings as django_settings
 from django.utils.timezone import now
 
 from .conf import settings
-
 from .models import (
     SUPERVISOR_ACTIVE,
     TaskQueue,
@@ -74,7 +72,7 @@ class Supervisor(object):
 def clean_queue_periodically(exit_event):
     """Call clean_queue() periodically in a separate thread."""
     while True:
-        if exit_event.wait(setting.AUTOTASK_CLEAN_INTERVALL):
+        if exit_event.wait(settings.AUTOTASK_CLEAN_INTERVALL):
             break
         clean_queue()
     exit_thread()
@@ -114,7 +112,8 @@ def set_supervisor_marker():
     """
     Checks whether a supervisor for a project is running.
     Returns True or False.
-    Regardless of the processes started for a project, there should only one supervisor be active.
+    Regardless of the processes started for a project, there should only
+    one supervisor be active.
     """
     try:
         with transaction.atomic():

@@ -12,6 +12,7 @@ from autotask.models import (
     ERROR,
     TaskQueue,
 )
+
 from autotask.supervisor import clean_queue
 from autotask.tasks import (
     DelayedTask,
@@ -27,21 +28,26 @@ from autotask.worker import (
 def add(a, b):
     return a + b
 
+
 @delayed_task()
 def add2(a, b):
     return a + b
+
 
 @delayed_task(retries=1)
 def add3(a, b):
     return a + b
 
+
 @delayed_task(ttl=0.1)
 def add4(a, b):
     return a + b
 
+
 @delayed_task()
 def mult(a, b):
     return a * b
+
 
 @delayed_task(delay=0.01)
 def mult2(a, b):

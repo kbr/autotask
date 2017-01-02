@@ -11,8 +11,6 @@ from django.utils.timezone import now
 from .conf import settings
 from .cron import CronScheduler
 from .models import (
-    WAITING,  # noqa
-    RUNNING,  # noqa
     DONE,
     ERROR,
     TaskQueue,

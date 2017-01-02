@@ -7,11 +7,7 @@ import pytest
 
 from django.utils.timezone import now
 
-from autotask.models import (
-    DONE,
-    TaskQueue,
-)
-
+from autotask.models import TaskQueue
 from autotask.supervisor import (
     clean_queue,
     delete_periodic_tasks,
