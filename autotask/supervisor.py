@@ -163,14 +163,9 @@ def start_supervisor():
         # marker already set, supervisor may be running in another process
         return None
     handler, exit_event = get_thread_shutdown_objects()
-    # start Supervisor:
-    thread = threading.Thread(target=Supervisor(), args=(exit_event,))
-    thread.start()
-    # start QueueCleaner:
-    thread = threading.Thread(target=QueueCleaner(), args=(exit_event,))
-    thread.start()
+    for service in (Supervisor, QueueCleaner):
+        thread = threading.Thread(target=service(), args=(exit_event,))
+        thread.start()
     # returning the ShutdownHandler can be ignored by the application
     # but is useful for testing
     return handler
-
-
